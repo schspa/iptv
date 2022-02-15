@@ -20,27 +20,35 @@
 #
 import m3u8
 from ffprobe import FFProbe
-import tempfile
-from urllib import *
+import urllib
 from urllib.request import urlretrieve
 import urllib
+import os
 import sys
+import time
 
-def get_iptv_info(url):
-    print(url)
+def get_iptv_info(url, verbose = True):
     m = m3u8.load(url)
-    if len(m.playlists) == 0:
-        return
-    pl = m.playlists[0]
-    m2 = m3u8.load(pl.absolute_uri)
-    for sm in m2.segments:
+
+    if len(m.playlists) > 0:
+        pl = m.playlists[0]
+        return get_iptv_info(pl.absolute_uri)
+
+    for sm in m.segments:
         url2 = sm.absolute_uri
-        print(url2)
         try:
+            start_time = time.time()
             (filename, headers) = urlretrieve(url2)
+            end_time = time.time()
+            size = os.path.getsize(filename)
+            speed = size / (end_time - start_time)
             metadata = FFProbe(filename)
-            print(metadata.metadata)
-            print(metadata.video[0].frame_size())
+            return {
+                "url" : url,
+                "linkspeed": speed,
+                "frame_size" : metadata.video[0].frame_size(),
+                "metadata" : metadata.metadata
+            }
             break;
         except URLError as e:
             raise RuntimeError("Failed to download '{}'. '{}'".format(url2, e.reason))
@@ -51,17 +59,14 @@ def get_iptv_info(url):
 if __name__ == '__main__':
     urls = [
         "http://112.17.40.145/PLTV/88888888/224/3221226154/index.m3u8",
-        "http://112.17.40.145/PLTV/88888888/224/3221226138/index.m3u8",
+        "http://183.207.248.71:80/cntv/live1/cctv-13/cctv-13",
+        "http://117.148.179.182/PLTV/88888888/224/3221231648/index.m3u8",
+        "http://39.134.115.163:8080/PLTV/88888910/224/3221225635/index.m3u8",
         "http://liveop.cctv.cn/hls/4KHD/playlist.m3u8"
     ]
 
     for url in urls:
         try:
-            get_iptv_info(url)
-        except urllib.error.HTTPError as e:
-            pass
-    for i in range(3221226154, 3221226254):
-        try:
-            get_iptv_info("http://112.17.40.145/PLTV/88888888/224/%d/index.m3u8" % (i))
+            print(get_iptv_info(url))
         except urllib.error.HTTPError as e:
             pass
